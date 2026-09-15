@@ -2171,6 +2171,14 @@ DEFAULT_CONFIG = {
         # Refresh an installed cua-driver during `hermes update` (best-effort, macOS only). Turn off
         # e.g. on non-admin accounts where /Applications isn't writable.
         "refresh_cua_driver": True,
+        # Pause updates while you work. ON (default): `hermes update` refuses to start while a
+        # Hermes session is running (TUI, REPL, Desktop backend, another REPL), so an update can
+        # never replace the venv under a live conversation. The refusal names the processes and
+        # the two escapes: `hermes update --force`, or turning this off. OFF: the update proceeds
+        # with those sessions running; on Windows the executable replace can then fail with
+        # WinError 32. Toggle: `hermes config set updates.pause_while_active false` (or true).
+        # `hermes update --check` always prints the current state.
+        "pause_while_active": True,
     },
     # LSP diagnostics (pyright, gopls, rust-analyzer...) in the post-write lint check of
     # write_file/patch. Runs only when the cwd or edited file is inside a git worktree; otherwise

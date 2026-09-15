@@ -425,6 +425,38 @@ def _filter_non_gateway_concurrent_instances(matches: list[tuple[int, str]]) -> 
     return [(pid, name) for pid, name in matches if _classify_concurrent_instance(pid) != "gateway"]
 
 
+def _running_sessions() -> list[tuple[int, str]]:
+    """Non-gateway Hermes processes on this host — i.e. sessions someone is working in. Best effort:
+    a failure to enumerate reports nothing rather than inventing work."""
+    try:
+        scripts_dir = _m()._venv_scripts_dir()
+        concurrent = _m()._detect_concurrent_hermes_instances(scripts_dir) if scripts_dir is not None else []
+        return _filter_non_gateway_concurrent_instances(concurrent) if concurrent else []
+    except Exception:
+        return []
+
+
+def _pause_while_active() -> bool:
+    """``updates.pause_while_active`` (default True). Read through the config loader so an edit takes
+    effect on the next run; an unreadable config keeps the safe default."""
+    try:
+        value = _updates_config().get("pause_while_active", True)
+    except Exception:
+        return True
+    return bool(value)
+
+
+def _print_pause_while_active_state(running: list[tuple[int, str]] | None = None) -> None:
+    """The visible half of the option: one line wherever update state is shown."""
+    if running is None:
+        running = _running_sessions()
+    state = ("ON — updates wait until your sessions finish"
+             if _pause_while_active() else
+             "OFF — updates run even while sessions are running")
+    suffix = f"   ({len(running)} session(s) running now)" if running else ""
+    print(f"  ⏸ Pause updates while you work: {state}{suffix}")
+
+
 def _log_only_write(text: str) -> None:
     """Write to update.log only: reaches past the ``_UpdateOutputStream`` stdout mirror so
     loud, low-signal subprocess output stays debuggable without flooding the terminal."""
@@ -593,6 +625,7 @@ def _print_update_check_result(behind: int | None, compare_branch: str) -> None:
         print(f"☤ Update available (behind {compare_branch}).")
     from hermes_cli.config import recommended_update_command
     print(f"  Run '{recommended_update_command()}' to install.")
+    _print_pause_while_active_state()
 
 
 def _repair_venv_on_current_checkout(
@@ -1052,9 +1085,16 @@ def _begin_update_receipt_and_plan(args):
         scripts_dir = _m()._venv_scripts_dir()
         concurrent = _m()._detect_concurrent_hermes_instances(scripts_dir) if scripts_dir is not None else []
         non_gateway = _m()._filter_non_gateway_concurrent_instances(concurrent) if concurrent else []
-        if non_gateway:
+        if non_gateway and _pause_while_active():
             print(_format_concurrent_instances_message(non_gateway, scripts_dir))
+            print("")
+            _print_pause_while_active_state(non_gateway)
+            print("     Turn it off for good with:  hermes config set updates.pause_while_active false")
             sys.exit(2)
+        if non_gateway:
+            print("⚠ updates.pause_while_active is off — updating with sessions still running.")
+            print("  Windows may refuse to replace hermes.exe (WinError 32) until they exit.")
+            _print_pause_while_active_state(non_gateway)
     return _pre_update_plan
 
 

@@ -1989,6 +1989,11 @@ updates:
   non_interactive_local_changes: "stash"
 
 
+  # Pause updates while you work: `hermes update` refuses to start while a Hermes session
+  # is running (TUI, REPL, Desktop backend), so an update never replaces the venv under a
+  # live conversation. Off = update anyway, with a warning. `hermes update --check` prints
+  # the current state.
+  pause_while_active: true
 # =============================================================================
 # Web Dashboard
 # =============================================================================
